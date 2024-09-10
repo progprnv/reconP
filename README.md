@@ -31,3 +31,8 @@
    cd reconP
    pip install requests httpx
 
+## Usage
+```bash
+python reconP.py -u example.com
+
+
