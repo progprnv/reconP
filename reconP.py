@@ -1,99 +1,165 @@
 import requests
-import httpx
+import argparse
 import asyncio
-import threading
+import httpx
+
+# Add your API keys here
+SHODAN_API_KEY = 'your_shodan_api_key'
+WHOIS_API_KEY = 'your_whoislookup_api_key'
+VIRUSTOTAL_API_KEY = 'your_virustotal_api_key'
+CENSYS_API_ID = '9f5a-be11-4b9e-9564-9596e78'
+CENSYS_API_SECRET = 'Va92kyMYPS7ANKpI8CjV'
+GOOGLE_API_KEY = 'AIzaSyCcEqqOERofbkudEY_iVC2_Wfv0A'
+ZOOMEYE_API_KEY = '3833802-b9FF-6E1A5-7d2d-9792d64082adf'
+INTELX_API_KEY = '1995e804-3c71-4938042-8042802-efa29ae2964d'
+REDHUNT_API_KEY = 'VRp7HK3jWiRSnpPfois7979spn4tvDVi0vM'
+DNSDUMPSTER_API_KEY = 'zsdqYb0rvIVYh2uPHo5Yk4EljV9GEKn44hDL9V2DFXznflW37Q5pZl8pvQHUHWav'
 
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (compatible; reconP/1.0; +https://example.com/bot)'
+    'User-Agent': 'Mozilla/5.0 (compatible; SubFinder/1.0; +https://example.com/bot)'
 }
 
-def load_wordlist(wordlist_file):
+# Function to get subdomains from Censys
+def get_censys_subdomains(domain):
+    print(f"[*] Searching Censys for subdomains of {domain}...")
     try:
-        with open(wordlist_file, 'r') as file:
-            paths = [line.strip() for line in file if line.strip()]
-        return paths
-    except FileNotFoundError:
-        print(f"Wordlist file '{wordlist_file}' not found.")
-        return []
+        url = f"https://search.censys.io/api/v1/search/certificates"
+        data = {
+            "query": domain,
+            "fields": ["parsed.names"],
+            "flatten": True
+        }
+        response = requests.post(url, json=data, auth=(CENSYS_API_ID, CENSYS_API_SECRET), headers=HEADERS)
+        if response.status_code == 200:
+            subdomains = response.json().get('results', [])
+            return [sub for result in subdomains for sub in result['parsed.names'] if domain in sub]
+        else:
+            print(f"[-] Censys API Error: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"[-] Error fetching data from Censys: {e}")
+    return []
 
+# Function to get subdomains from VirusTotal
+def get_virustotal_subdomains(domain):
+    print(f"[*] Searching VirusTotal for subdomains of {domain}...")
+    try:
+        url = f"https://www.virustotal.com/vtapi/v2/domain/report?apikey={VIRUSTOTAL_API_KEY}&domain={domain}"
+        response = requests.get(url, headers=HEADERS)
+        if response.status_code == 200:
+            return response.json().get('subdomains', [])
+        else:
+            print(f"[-] VirusTotal API Error: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"[-] Error fetching data from VirusTotal: {e}")
+    return []
+
+# Function to get subdomains from Intelx
+def get_intelx_subdomains(domain):
+    print(f"[*] Searching Intelx for subdomains of {domain}...")
+    try:
+        url = f"https://2.intelx.io/intelligent/search/domain/{domain}?apikey={INTELX_API_KEY}"
+        response = requests.get(url, headers=HEADERS)
+        if response.status_code == 200:
+            return response.json().get('subdomains', [])
+        else:
+            print(f"[-] Intelx API Error: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"[-] Error fetching data from Intelx: {e}")
+    return []
+
+# Function to get subdomains from ZoomEye
+def get_zoomeye_subdomains(domain):
+    print(f"[*] Searching ZoomEye for subdomains of {domain}...")
+    try:
+        url = f"https://api.zoomeye.org/host/search?query=site:{domain}&apikey={ZOOMEYE_API_KEY}"
+        response = requests.get(url, headers=HEADERS)
+        if response.status_code == 200:
+            return [hit['name'] for hit in response.json().get('matches', []) if 'name' in hit]
+        else:
+            print(f"[-] ZoomEye API Error: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"[-] Error fetching data from ZoomEye: {e}")
+    return []
+
+# Function to get subdomains from RedHunt Labs
+def get_redhunt_subdomains(domain):
+    print(f"[*] Searching RedHunt Labs for subdomains of {domain}...")
+    try:
+        url = f"https://reconapi.redhuntlabs.com/community/v1/domains/subdomains/{domain}?apikey={REDHUNT_API_KEY}"
+        response = requests.get(url, headers=HEADERS)
+        if response.status_code == 200:
+            return response.json().get('subdomains', [])
+        else:
+            print(f"[-] RedHunt Labs API Error: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"[-] Error fetching data from RedHunt Labs: {e}")
+    return []
+
+# Function to get subdomains from DNSDumpster
+def get_dnsdumpster_subdomains(domain):
+    print(f"[*] Searching DNSDumpster for subdomains of {domain}...")
+    try:
+        url = f"https://dnsdumpster.com/api/{domain}?apikey={DNSDUMPSTER_API_KEY}"
+        response = requests.get(url, headers=HEADERS)
+        if response.status_code == 200:
+            return response.json().get('dns_records', {}).get('hostnames', [])
+        else:
+            print(f"[-] DNSDumpster API Error: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"[-] Error fetching data from DNSDumpster: {e}")
+    return []
+
+# Function to check if subdomains are alive
 async def check_alive_subdomain(subdomain, alive_subdomains):
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get(subdomain, headers=HEADERS, timeout=5)
+            response = await client.get(f"http://{subdomain}", headers=HEADERS, timeout=5)
             if response.status_code == 200:
                 alive_subdomains.append(subdomain)
                 print(f"[+] Alive: {subdomain}")
-            else:
-                print(f"[-] Not alive: {subdomain}")
-        except httpx.RequestError as e:
-            print(f"Error checking {subdomain}: {e}")
+        except Exception as e:
+            print(f"[-] Error checking {subdomain}: {e}")
 
-async def check_all_subdomains(subdomains):
-    alive_subdomains = []
-    tasks = [check_alive_subdomain(subdomain, alive_subdomains) for subdomain in subdomains]
-    await asyncio.gather(*tasks)
-    return alive_subdomains
+# Main function to gather subdomains and check if they are alive
+async def find_and_check_subdomains(domain):
+    all_subdomains = set()
 
-def check_url(url, results):
-    try:
-        response = requests.get(url, headers=HEADERS, timeout=5)
-        if response.status_code == 200:
-            results.append(f"[+] Found: {url}")
-        else:
-            results.append(f"[-] Not found: {url}")
-    except requests.RequestException as e:
-        results.append(f"Error checking {url}: {e}")
+    # Get subdomains from various APIs
+    all_subdomains.update(get_censys_subdomains(domain))
+    all_subdomains.update(get_virustotal_subdomains(domain))
+    all_subdomains.update(get_intelx_subdomains(domain))
+    all_subdomains.update(get_zoomeye_subdomains(domain))
+    all_subdomains.update(get_redhunt_subdomains(domain))
+    all_subdomains.update(get_dnsdumpster_subdomains(domain))
 
-def scan_website(base_url, wordlist_file, threads=10):
-    paths = load_wordlist(wordlist_file)
-    if not paths:
-        print("No paths to scan. Please check the wordlist file.")
-        return
+    print(f"[*] Total discovered subdomains: {len(all_subdomains)}")
 
-    if not base_url.startswith('http://') and not base_url.startswith('https://'):
-        base_url = 'http://' + base_url
+    # Check which subdomains are alive
+    if all_subdomains:
+        alive_subdomains = []
+        tasks = [check_alive_subdomain(subdomain, alive_subdomains) for subdomain in all_subdomains]
+        await asyncio.gather(*tasks)
 
-    print(f"Scanning {base_url} for common vulnerabilities...")
+        print(f"[*] Total alive subdomains: {len(alive_subdomains)}")
+        return alive_subdomains
+    else:
+        print("[-] No subdomains found.")
+        return []
 
-    results = []
-    threads_list = []
-
-    for path in paths:
-        full_url = base_url.rstrip('/') + '/' + path
-        thread = threading.Thread(target=check_url, args=(full_url, results))
-        threads_list.append(thread)
-        thread.start()
-
-        if len(threads_list) >= threads:
-            for t in threads_list:
-                t.join()
-            threads_list = []
-
-    for t in threads_list:
-        t.join()
-
-    for result in results:
-        print(result)
-
-    print("Scan complete.")
-
-    save_results = input("Would you like to save the results to a file? (y/n): ").strip().lower()
-    if save_results == 'y':
-        file_name = input("Enter the filename to save the results: ").strip()
-        with open(file_name, 'w') as file:
-            for result in results:
-                file.write(result + '\n')
-        print(f"Results saved to {file_name}")
-
+# Command-line interface
 if __name__ == "__main__":
-    target_url = input("Enter the target URL: ").strip()
-    wordlist_file = input("Enter the path to the wordlist file: ").strip()
-    
-    subdomains_file = input("Enter the path to the subdomains file: ").strip()
-    subdomains = load_wordlist(subdomains_file)
-    
-    print("Checking for alive subdomains...")
-    alive_subdomains = asyncio.run(check_all_subdomains(subdomains))
-    
-    for alive_subdomain in alive_subdomains:
-        scan_website(alive_subdomain, wordlist_file)
+    parser = argparse.ArgumentParser(description="Subdomain Finder using multiple APIs.")
+    parser.add_argument("-u", "--url", help="Target domain to find subdomains for", required=True)
+    args = parser.parse_args()
+
+    target_domain = args.url.strip()
+
+    print(f"[*] Starting subdomain discovery for {target_domain}...")
+    alive_subdomains = asyncio.run(find_and_check_subdomains(target_domain))
+
+    if alive_subdomains:
+        print("[*] Alive subdomains:")
+        for subdomain in alive_subdomains:
+            print(f" - {subdomain}")
+    else:
+        print("[-] No alive subdomains found.")
