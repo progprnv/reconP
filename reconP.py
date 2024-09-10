@@ -2,6 +2,7 @@ import requests
 import argparse
 import asyncio
 import httpx
+import subprocess
 
 # Add your API keys here
 SHODAN_API_KEY = 'your_shodan_api_key'
@@ -109,6 +110,28 @@ def get_dnsdumpster_subdomains(domain):
         print(f"[-] Error fetching data from DNSDumpster: {e}")
     return []
 
+# Function to get URLs from Waybackurls
+def get_waybackurls(domain):
+    print(f"[*] Searching Waybackurls for URLs of {domain}...")
+    try:
+        result = subprocess.run(['waybackurls', domain], capture_output=True, text=True)
+        urls = result.stdout.splitlines()
+        return urls
+    except Exception as e:
+        print(f"[-] Error fetching data from Waybackurls: {e}")
+    return []
+
+# Function to get URLs from Katana
+def get_katana_urls(domain):
+    print(f"[*] Searching Katana for URLs of {domain}...")
+    try:
+        result = subprocess.run(['katana', '-d', domain], capture_output=True, text=True)
+        urls = result.stdout.splitlines()
+        return urls
+    except Exception as e:
+        print(f"[-] Error fetching data from Katana: {e}")
+    return []
+
 # Function to check if subdomains are alive
 async def check_alive_subdomain(subdomain, alive_subdomains):
     async with httpx.AsyncClient() as client:
@@ -123,6 +146,7 @@ async def check_alive_subdomain(subdomain, alive_subdomains):
 # Main function to gather subdomains and check if they are alive
 async def find_and_check_subdomains(domain):
     all_subdomains = set()
+    all_urls = set()
 
     # Get subdomains from various APIs
     all_subdomains.update(get_censys_subdomains(domain))
@@ -132,7 +156,12 @@ async def find_and_check_subdomains(domain):
     all_subdomains.update(get_redhunt_subdomains(domain))
     all_subdomains.update(get_dnsdumpster_subdomains(domain))
 
+    # Get URLs from Waybackurls and Katana
+    all_urls.update(get_waybackurls(domain))
+    all_urls.update(get_katana_urls(domain))
+
     print(f"[*] Total discovered subdomains: {len(all_subdomains)}")
+    print(f"[*] Total discovered URLs: {len(all_urls)}")
 
     # Check which subdomains are alive
     if all_subdomains:
@@ -141,25 +170,26 @@ async def find_and_check_subdomains(domain):
         await asyncio.gather(*tasks)
 
         print(f"[*] Total alive subdomains: {len(alive_subdomains)}")
-        return alive_subdomains
+        return alive_subdomains, all_urls
     else:
         print("[-] No subdomains found.")
-        return []
+        return [], all_urls
 
 # Command-line interface
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Subdomain Finder using multiple APIs.")
-    parser.add_argument("-u", "--url", help="Target domain to find subdomains for", required=True)
+    parser.add_argument("-u", "--url", help="Target domain to find subdomains and URLs for", required=True)
     args = parser.parse_args()
 
     target_domain = args.url.strip()
 
-    print(f"[*] Starting subdomain discovery for {target_domain}...")
-    alive_subdomains = asyncio.run(find_and_check_subdomains(target_domain))
+    print(f"[*] Starting subdomain and URL discovery for {target_domain}...")
+    alive_subdomains, discovered_urls = asyncio.run(find_and_check_subdomains(target_domain))
 
-    if alive_subdomains:
-        print("[*] Alive subdomains:")
-        for subdomain in alive_subdomains:
-            print(f" - {subdomain}")
-    else:
-        print("[-] No alive subdomains found.")
+    print(f"\n[*] Discovered Subdomains:")
+    for subdomain in alive_subdomains:
+        print(f"  - {subdomain}")
+
+    print(f"\n[*] Discovered URLs:")
+    for url in discovered_urls:
+        print(f"  - {url}")
