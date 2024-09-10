@@ -4,8 +4,6 @@
 
 # reconP
 
-## Description
-
 **reconP** is a powerful subdomain discovery and verification tool that integrates multiple APIs to gather and check the status of subdomains for a given target domain. It utilizes various services to enhance subdomain enumeration and validate the operational status of discovered subdomains.
 
 ## Features
@@ -25,11 +23,19 @@
 
 ## Installation
 
-1. **Clone the repository** (if applicable):
+1. **Clone the repository (Pre-Requisites)**:
    ```bash
+        # Install waybackurls
+        go install github.com/tomnomnom/waybackurls@latest
+
+        # Install katana
+        go install github.com/projectdiscovery/katana/cmd/katana@latest
+
+   
    git clone https://github.com/your-repo/reconP.git
    cd reconP
    pip install requests httpx
+
 
 ## Usage
 ```bash
