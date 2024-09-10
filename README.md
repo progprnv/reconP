@@ -29,3 +29,5 @@
    ```bash
    git clone https://github.com/your-repo/reconP.git
    cd reconP
+   pip install requests httpx
+
