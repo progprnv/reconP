@@ -1,33 +1,31 @@
-# reconP
+
 
 ![image](https://github.com/progprnv/reconP/assets/145828371/ee620ef9-a7e2-46b1-a734-3b54516fe3e2)
 
+# reconP
 
-reconP is a simple web server scanner tool that checks for common vulnerabilities and issues on a given website. This tool reads common paths from a wordlist file and scans the target website.
+## Description
+
+**reconP** is a powerful subdomain discovery and verification tool that integrates multiple APIs to gather and check the status of subdomains for a given target domain. It utilizes various services to enhance subdomain enumeration and validate the operational status of discovered subdomains.
 
 ## Features
 
-- Interactive selection of target URL and wordlist file
-- Scans for common vulnerabilities
-- Simple and easy to use
+- **API Integration**: Fetches subdomains from multiple APIs including Censys, VirusTotal, Intelx, ZoomEye, RedHunt Labs, and DNSDumpster.
+- **Subdomain Verification**: Asynchronously checks if the discovered subdomains are alive.
+- **Command-Line Interface**: Easily run the tool via command-line arguments.
 
-## Installation and Usage
+## APIs Used
 
-### Prerequisites
+- **Censys**: For certificate-based subdomain discovery.
+- **VirusTotal**: To obtain subdomain data from domain reports.
+- **Intelx**: Provides subdomain information from intelligent searches.
+- **ZoomEye**: Fetches subdomains from host searches.
+- **RedHunt Labs**: Retrieves subdomains from reconnaissance data.
+- **DNSDumpster**: Gathers DNS records and subdomains.
 
-- Python 3.x
-- `requests` library (Install using `pip install requests`)
+## Installation
 
-### Steps
-
-1. **Clone the Repository:**
+1. **Clone the repository** (if applicable):
    ```bash
-   git clone https://github.com/yourusername/reconP.git
+   git clone https://github.com/your-repo/reconP.git
    cd reconP
-
-
-Example:
-$ python reconP.py
-Enter the target URL: example.com
-Enter the path to the wordlist file: wordlist.txt
-Scanning http://example.com for common vulnerabilities...
